@@ -1,0 +1,25 @@
+﻿@model MealPlannerApp.Models.MealPlan
+
+<h2>Meal Plan Details</h2>
+
+<p><strong>Title:</strong> @Model.Title</p>
+<p><strong>Start Date:</strong> @Model.StartDate.ToShortDateString()</p>
+<p><strong>End Date:</strong> @Model.EndDate.ToShortDateString()</p>
+
+<h4>Meals:</h4>
+@if (Model.Meals != null && Model.Meals.Any())
+{
+    <ul>
+        @foreach (var meal in Model.Meals)
+        {
+            <li>@meal.Name (@meal.TimeOfDay)</li>
+        }
+    </ul>
+}
+else
+{
+    <p>No meals in this plan.</p>
+}
+
+<a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+<a asp-action="Index" class="btn btn-secondary">Back to List</a>

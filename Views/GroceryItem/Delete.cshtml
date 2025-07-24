@@ -1,0 +1,15 @@
+﻿@model MealPlannerApp.Models.GroceryItem
+@{
+    ViewData["Title"] = "Delete";
+}
+
+<h2>Are you sure you want to delete this?</h2>
+<div>
+    <strong>@Model.Name</strong> — @Model.Quantity
+</div>
+
+<form asp-action="DeleteConfirmed">
+    <input type="hidden" asp-for="Id" />
+    <button type="submit" class="btn btn-danger">Delete</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>

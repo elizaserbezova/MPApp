@@ -1,0 +1,13 @@
+﻿@model MealPlannerApp.Models.GroceryItem
+@{
+    ViewData["Title"] = "Details";
+}
+
+<h2>Grocery Item Details</h2>
+<div>
+    <strong>Name:</strong> @Model.Name <br />
+    <strong>Quantity:</strong> @Model.Quantity <br />
+    <strong>Purchased:</strong> @Model.IsPurchased <br />
+    <strong>Meal Plan:</strong> @Model.MealPlan?.Title
+</div>
+<a asp-action="Index" class="btn btn-secondary mt-3">Back to List</a>

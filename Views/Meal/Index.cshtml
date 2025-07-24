@@ -1,0 +1,39 @@
+﻿@model IEnumerable<MealPlannerApp.Models.Meal>
+
+@{
+    ViewData["Title"] = "Meals";
+}
+
+<h1>Meals</h1>
+
+<p>
+    <a asp-action="Create" class="btn btn-primary">Create New Meal</a>
+</p>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Date</th>
+            <th>Time of Day</th>
+            <th>Recipe</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var meal in Model)
+        {
+            <tr>
+                <td>@meal.Name</td>
+                <td>@meal.Date.ToShortDateString()</td>
+                <td>@meal.TimeOfDay</td>
+                <td>@meal.Recipe?.Name</td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@meal.Id">Edit</a> |
+                    <a asp-action="Details" asp-route-id="@meal.Id">Details</a> |
+                    <a asp-action="Delete" asp-route-id="@meal.Id">Delete</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
