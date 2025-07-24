@@ -121,6 +121,7 @@ namespace MealPlannerApp.Controllers
             return View(item);
         }
 
+        //TODO: Fix this
         [HttpPost, ActionName("DeleteConfirmed")]
         [ValidateAntiForgeryToken]
         public IActionResult DeleteConfirmed(int id)
