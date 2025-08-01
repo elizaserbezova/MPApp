@@ -1,54 +1,43 @@
-﻿using MealPlannerApp.Data;
-using MealPlannerApp.Models;
+﻿using MealPlannerApp.Models;
+using MealPlannerApp.Services.Interfaces;
 using MealPlannerApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 
 namespace MealPlannerApp.Controllers
 {
     public class MealPlanController : Controller
     {
-        private readonly ApplicationDbContext context;
+        private readonly IMealPlanService _mealPlanService;
+        private readonly IMealService _mealService;
 
-        public MealPlanController(ApplicationDbContext context)
+        public MealPlanController(IMealPlanService mealPlanService, IMealService mealService)
         {
-            this.context = context;
+            _mealPlanService = mealPlanService;
+            _mealService = mealService;
         }
 
         public IActionResult Index()
         {
-            var plans = context.MealPlans.Include(p => p.Meals).ToList();
+            var plans = _mealPlanService.GetAll();
             return View(plans);
         }
 
         public IActionResult Details(int id)
         {
-            var plan = context.MealPlans
-                .Include(p => p.Meals)
-                .ThenInclude(m => m.Recipe)
-                .FirstOrDefault(p => p.Id == id);
-
-            if (plan == null)
-            {
-                return NotFound();
-            }
+            var plan = _mealPlanService.GetById(id);
+            if (plan == null) return NotFound();
             return View(plan);
         }
 
         public IActionResult Create()
         {
-            var meals = context.Meals.ToList();
-
             var viewModel = new MealPlanFormViewModel
             {
-                AllMeals = meals.Select(m => new SelectListItem
-                {
-                    Value = m.Id.ToString(),
-                    Text = m.Name
-                }).ToList()
+                AllMeals = _mealService.GetAll()
+                    .Select(m => new SelectListItem { Value = m.Id.ToString(), Text = m.Name })
+                    .ToList()
             };
-
             return View(viewModel);
         }
 
@@ -58,16 +47,13 @@ namespace MealPlannerApp.Controllers
         {
             if (!ModelState.IsValid)
             {
-                viewModel.AllMeals = context.Meals.Select(m => new SelectListItem
-                {
-                    Value = m.Id.ToString(),
-                    Text = m.Name
-                }).ToList();
-
+                viewModel.AllMeals = _mealService.GetAll()
+                    .Select(m => new SelectListItem { Value = m.Id.ToString(), Text = m.Name })
+                    .ToList();
                 return View(viewModel);
             }
 
-            // Step 1: Create and save MealPlan
+            // 🔁 Ръчно мапване към MealPlan
             var mealPlan = new MealPlan
             {
                 Title = viewModel.Title,
@@ -75,35 +61,22 @@ namespace MealPlannerApp.Controllers
                 EndDate = viewModel.EndDate
             };
 
-            context.MealPlans.Add(mealPlan);
-            context.SaveChanges(); // now mealPlan.Id is set
-
-            // Load all meals into memory, then filter
-            var allMeals = context.Meals.ToList(); // Fetches everything from DB
-            var selectedMeals = allMeals
+            // Добавяне на избрани ястия
+            var selectedMeals = _mealService
+                .GetAll()
                 .Where(m => viewModel.SelectedMealIds.Contains(m.Id))
-                .ToList(); // Filter in C#
+                .ToList();
 
-            foreach (var meal in selectedMeals)
-            {
-                meal.MealPlanId = mealPlan.Id;
-            }
+            mealPlan.Meals.AddRange(selectedMeals);
 
-            context.SaveChanges();
-
+            _mealPlanService.Create(mealPlan);
             return RedirectToAction(nameof(Index));
         }
 
         public IActionResult Edit(int id)
         {
-            var plan = context.MealPlans
-                .Include(mp => mp.Meals)
-                .FirstOrDefault(mp => mp.Id == id);
-
-            if (plan == null)
-            {
-                return NotFound();
-            }
+            var plan = _mealPlanService.GetById(id);
+            if (plan == null) return NotFound();
 
             var viewModel = new MealPlanFormViewModel
             {
@@ -112,11 +85,9 @@ namespace MealPlannerApp.Controllers
                 StartDate = plan.StartDate,
                 EndDate = plan.EndDate,
                 SelectedMealIds = plan.Meals.Select(m => m.Id).ToList(),
-                AllMeals = context.Meals.Select(m => new SelectListItem
-                {
-                    Value = m.Id.ToString(),
-                    Text = m.Name
-                }).ToList()
+                AllMeals = _mealService.GetAll()
+                    .Select(m => new SelectListItem { Value = m.Id.ToString(), Text = m.Name })
+                    .ToList()
             };
 
             return View(viewModel);
@@ -128,46 +99,37 @@ namespace MealPlannerApp.Controllers
         {
             if (!ModelState.IsValid)
             {
-                viewModel.AllMeals = context.Meals.Select(m => new SelectListItem
-                {
-                    Value = m.Id.ToString(),
-                    Text = m.Name
-                }).ToList();
+                viewModel.AllMeals = _mealService.GetAll()
+                    .Select(m => new SelectListItem { Value = m.Id.ToString(), Text = m.Name })
+                    .ToList();
                 return View(viewModel);
             }
 
-            var mealPlan = context.MealPlans
-                .Include(mp => mp.Meals)
-                .FirstOrDefault(mp => mp.Id == viewModel.Id);
+            var plan = _mealPlanService.GetById(viewModel.Id);
+            if (plan == null) return NotFound();
 
-            if (mealPlan == null)
-            {
-                return NotFound();
-            }
+            // 🔁 Ръчно обновяване на полетата
+            plan.Title = viewModel.Title;
+            plan.StartDate = viewModel.StartDate;
+            plan.EndDate = viewModel.EndDate;
 
-            mealPlan.Title = viewModel.Title;
-            mealPlan.StartDate = viewModel.StartDate;
-            mealPlan.EndDate = viewModel.EndDate;
-
-            // Clear and update selected meals
-            mealPlan.Meals.Clear();
-            var selectedMeals = context.Meals
+            // Обновяване на избраните ястия
+            plan.Meals.Clear();
+            var selectedMeals = _mealService
+                .GetAll()
                 .Where(m => viewModel.SelectedMealIds.Contains(m.Id))
                 .ToList();
-            mealPlan.Meals.AddRange(selectedMeals);
 
-            context.SaveChanges();
+            plan.Meals.AddRange(selectedMeals);
 
+            _mealPlanService.Update(plan);
             return RedirectToAction(nameof(Index));
         }
 
         public IActionResult Delete(int id)
         {
-            var plan = context.MealPlans.Find(id);
-            if (plan == null)
-            {
-                return NotFound();
-            }
+            var plan = _mealPlanService.GetById(id);
+            if (plan == null) return NotFound();
             return View(plan);
         }
 
@@ -175,17 +137,7 @@ namespace MealPlannerApp.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult DeleteConfirmed(int id)
         {
-            var plan = context.MealPlans
-                .Include(mp => mp.Meals)
-                .FirstOrDefault(p => p.Id == id);
-
-            if (plan != null)
-            {
-                plan.Meals.Clear(); // Ensure FK deletion doesn't fail
-                context.MealPlans.Remove(plan);
-                context.SaveChanges();
-            }
-
+            _mealPlanService.Delete(id);
             return RedirectToAction(nameof(Index));
         }
     }

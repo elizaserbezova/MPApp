@@ -1,23 +1,31 @@
-﻿using MealPlannerApp.Data;
-using MealPlannerApp.Models;
+﻿using MealPlannerApp.Models;
+using MealPlannerApp.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace MealPlannerApp.Controllers
 {
     public class RecipeController : Controller
     {
-        private readonly ApplicationDbContext context;
+        private readonly IRecipeService _recipeService;
 
-        public RecipeController(ApplicationDbContext context)
+        public RecipeController(IRecipeService recipeService)
         {
-            this.context = context;
+            _recipeService = recipeService;
         }
 
-        public IActionResult Index ()
+        public IActionResult Index()
         {
-            var recipes = context.Recipes.ToList();
+            var recipes = _recipeService.GetAll();
             return View(recipes);
+        }
+
+        public IActionResult Details(int id)
+        {
+            var recipe = _recipeService.GetById(id);
+            if (recipe == null)
+                return NotFound();
+
+            return View(recipe);
         }
 
         public IActionResult Create()
@@ -26,52 +34,21 @@ namespace MealPlannerApp.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public IActionResult Create(Recipe recipe)
         {
             if (ModelState.IsValid)
             {
-                context.Recipes.Add(recipe);
-                context.SaveChanges();
+                _recipeService.Create(recipe);
                 return RedirectToAction(nameof(Index));
             }
-            return View(recipe);
-        }
 
-        public IActionResult Details(int Id)
-        {
-            var recipe = context.Recipes.FirstOrDefault(r => r.Id == Id);
-            if(recipe == null)
-            {
-                return NotFound();
-            }
             return View(recipe);
-        }
-
-        public IActionResult Delete(int Id)
-        {
-            var recipe = context.Recipes.FirstOrDefault(r => r.Id == Id);
-            if (recipe == null)
-            {
-                return NotFound();
-            }
-            return View(recipe);
-        }
-
-        [HttpPost, ActionName("Delete")]
-        public IActionResult DeleteConfirmed(int Id)
-        {
-            var recipe = context.Recipes.FirstOrDefault(r => r.Id == Id);
-            if (recipe != null)
-            {
-                context.Recipes.Remove(recipe);
-                context.SaveChanges();
-            }
-            return RedirectToAction(nameof(Index));
         }
 
         public IActionResult Edit(int id)
         {
-            var recipe = context.Recipes.FirstOrDefault(r => r.Id == id);
+            var recipe = _recipeService.GetById(id);
             if (recipe == null)
                 return NotFound();
 
@@ -79,16 +56,33 @@ namespace MealPlannerApp.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public IActionResult Edit(Recipe recipe)
         {
             if (ModelState.IsValid)
             {
-                context.Recipes.Update(recipe);
-                context.SaveChanges();
+                _recipeService.Update(recipe);
                 return RedirectToAction(nameof(Index));
             }
 
             return View(recipe);
+        }
+
+        public IActionResult Delete(int id)
+        {
+            var recipe = _recipeService.GetById(id);
+            if (recipe == null)
+                return NotFound();
+
+            return View(recipe);
+        }
+
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public IActionResult DeleteConfirmed(int id)
+        {
+            _recipeService.Delete(id);
+            return RedirectToAction(nameof(Index));
         }
     }
 }

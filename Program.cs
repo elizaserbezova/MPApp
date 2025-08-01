@@ -2,6 +2,10 @@ using MealPlannerApp.Data;
 using MealPlannerApp.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using MealPlannerApp.Data.Repositories.Interfaces;
+using MealPlannerApp.Data.Repositories;
+using MealPlannerApp.Services.Interfaces;
+using MealPlannerApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +20,18 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
     options.SignIn.RequireConfirmedAccount = false;
 })
 .AddEntityFrameworkStores<ApplicationDbContext>();
+
+builder.Services.AddScoped<IIngredientRepository, IngredientRepository>();
+builder.Services.AddScoped<IRecipeRepository, RecipeRepository>();
+builder.Services.AddScoped<IMealRepository, MealRepository>();
+builder.Services.AddScoped<IMealPlanRepository, MealPlanRepository>();
+builder.Services.AddScoped<IGroceryItemRepository, GroceryItemRepository>();
+
+builder.Services.AddScoped<IIngredientService, IngredientService>();
+builder.Services.AddScoped<IRecipeService, RecipeService>();
+builder.Services.AddScoped<IMealService, MealService>();
+builder.Services.AddScoped<IMealPlanService, MealPlanService>();
+builder.Services.AddScoped<IGroceryItemService, GroceryItemService>();
 
 var app = builder.Build();
 

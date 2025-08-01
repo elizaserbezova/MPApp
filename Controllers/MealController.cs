@@ -1,30 +1,31 @@
-﻿using MealPlannerApp.Data;
-using MealPlannerApp.Models;
+﻿using MealPlannerApp.Models;
+using MealPlannerApp.Services.Interfaces;
 using MealPlannerApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 
 namespace MealPlannerApp.Controllers
 {
     public class MealController : Controller
     {
-        private readonly ApplicationDbContext context;
+        private readonly IMealService _mealService;
+        private readonly IRecipeService _recipeService;
 
-        public MealController(ApplicationDbContext context)
+        public MealController(IMealService mealService, IRecipeService recipeService)
         {
-            this.context = context;
+            _mealService = mealService;
+            _recipeService = recipeService;
         }
 
         public IActionResult Index()
         {
-            var meals = context.Meals.Include(m => m.Recipe).ToList();
+            var meals = _mealService.GetAll();
             return View(meals);
         }
 
         public IActionResult Details(int id)
         {
-            var meal = context.Meals.Include(m => m.Recipe).FirstOrDefault(m => m.Id == id);
+            var meal = _mealService.GetById(id);
             if (meal == null) return NotFound();
             return View(meal);
         }
@@ -33,7 +34,7 @@ namespace MealPlannerApp.Controllers
         {
             var viewModel = new MealFormViewModel
             {
-                Recipes = context.Recipes
+                Recipes = _recipeService.GetAll()
                     .Select(r => new SelectListItem
                     {
                         Value = r.Id.ToString(),
@@ -50,7 +51,7 @@ namespace MealPlannerApp.Controllers
         {
             if (!ModelState.IsValid)
             {
-                viewModel.Recipes = context.Recipes
+                viewModel.Recipes = _recipeService.GetAll()
                     .Select(r => new SelectListItem
                     {
                         Value = r.Id.ToString(),
@@ -67,15 +68,13 @@ namespace MealPlannerApp.Controllers
                 RecipeId = viewModel.RecipeId
             };
 
-            context.Meals.Add(meal);
-            context.SaveChanges();
-
+            _mealService.Create(meal);
             return RedirectToAction(nameof(Index));
         }
 
         public IActionResult Edit(int id)
         {
-            var meal = context.Meals.FirstOrDefault(m => m.Id == id);
+            var meal = _mealService.GetById(id);
             if (meal == null) return NotFound();
 
             var viewModel = new MealFormViewModel
@@ -85,7 +84,7 @@ namespace MealPlannerApp.Controllers
                 Date = meal.Date,
                 TimeOfDay = meal.TimeOfDay,
                 RecipeId = meal.RecipeId,
-                Recipes = context.Recipes
+                Recipes = _recipeService.GetAll()
                     .Select(r => new SelectListItem
                     {
                         Value = r.Id.ToString(),
@@ -102,7 +101,7 @@ namespace MealPlannerApp.Controllers
         {
             if (!ModelState.IsValid)
             {
-                viewModel.Recipes = context.Recipes
+                viewModel.Recipes = _recipeService.GetAll()
                     .Select(r => new SelectListItem
                     {
                         Value = r.Id.ToString(),
@@ -111,7 +110,7 @@ namespace MealPlannerApp.Controllers
                 return View(viewModel);
             }
 
-            var meal = context.Meals.FirstOrDefault(m => m.Id == viewModel.Id);
+            var meal = _mealService.GetById(viewModel.Id);
             if (meal == null) return NotFound();
 
             meal.Name = viewModel.Name;
@@ -119,14 +118,13 @@ namespace MealPlannerApp.Controllers
             meal.TimeOfDay = viewModel.TimeOfDay;
             meal.RecipeId = viewModel.RecipeId;
 
-            context.SaveChanges();
-
+            _mealService.Update(meal);
             return RedirectToAction(nameof(Index));
         }
 
         public IActionResult Delete(int id)
         {
-            var meal = context.Meals.Include(m => m.Recipe).FirstOrDefault(m => m.Id == id);
+            var meal = _mealService.GetById(id);
             if (meal == null) return NotFound();
             return View(meal);
         }
@@ -135,13 +133,7 @@ namespace MealPlannerApp.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult DeleteConfirmed(int id)
         {
-            var meal = context.Meals.FirstOrDefault(m => m.Id == id);
-            if (meal != null)
-            {
-                context.Meals.Remove(meal);
-                context.SaveChanges();
-            }
-
+            _mealService.Delete(id);
             return RedirectToAction(nameof(Index));
         }
     }

@@ -1,30 +1,31 @@
-﻿using MealPlannerApp.Data;
-using MealPlannerApp.Models;
+﻿using MealPlannerApp.Models;
+using MealPlannerApp.Services.Interfaces;
 using MealPlannerApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 
 namespace MealPlannerApp.Controllers
 {
     public class GroceryItemController : Controller
     {
-        private readonly ApplicationDbContext context;
+        private readonly IGroceryItemService _groceryItemService;
+        private readonly IMealPlanService _mealPlanService;
 
-        public GroceryItemController(ApplicationDbContext context)
+        public GroceryItemController(IGroceryItemService groceryItemService, IMealPlanService mealPlanService)
         {
-            this.context = context;
+            _groceryItemService = groceryItemService;
+            _mealPlanService = mealPlanService;
         }
 
         public IActionResult Index()
         {
-            var items = context.GroceryItems.Include(g => g.MealPlan).ToList();
+            var items = _groceryItemService.GetAll();
             return View(items);
         }
 
         public IActionResult Details(int id)
         {
-            var item = context.GroceryItems.Include(g => g.MealPlan).FirstOrDefault(g => g.Id == id);
+            var item = _groceryItemService.GetById(id);
             if (item == null) return NotFound();
             return View(item);
         }
@@ -33,7 +34,7 @@ namespace MealPlannerApp.Controllers
         {
             var viewModel = new GroceryItemFormViewModel
             {
-                MealPlans = context.MealPlans
+                MealPlans = _mealPlanService.GetAll()
                     .Select(mp => new SelectListItem { Value = mp.Id.ToString(), Text = mp.Title })
                     .ToList()
             };
@@ -47,7 +48,7 @@ namespace MealPlannerApp.Controllers
         {
             if (!ModelState.IsValid)
             {
-                viewModel.MealPlans = context.MealPlans
+                viewModel.MealPlans = _mealPlanService.GetAll()
                     .Select(mp => new SelectListItem { Value = mp.Id.ToString(), Text = mp.Title })
                     .ToList();
 
@@ -62,15 +63,13 @@ namespace MealPlannerApp.Controllers
                 MealPlanId = viewModel.MealPlanId
             };
 
-            context.GroceryItems.Add(item);
-            context.SaveChanges();
-
+            _groceryItemService.Create(item);
             return RedirectToAction(nameof(Index));
         }
 
         public IActionResult Edit(int id)
         {
-            var item = context.GroceryItems.Find(id);
+            var item = _groceryItemService.GetById(id);
             if (item == null) return NotFound();
 
             var viewModel = new GroceryItemFormViewModel
@@ -79,7 +78,7 @@ namespace MealPlannerApp.Controllers
                 Quantity = item.Quantity,
                 IsPurchased = item.IsPurchased,
                 MealPlanId = item.MealPlanId,
-                MealPlans = context.MealPlans
+                MealPlans = _mealPlanService.GetAll()
                     .Select(mp => new SelectListItem { Value = mp.Id.ToString(), Text = mp.Title })
                     .ToList()
             };
@@ -94,7 +93,7 @@ namespace MealPlannerApp.Controllers
         {
             if (!ModelState.IsValid)
             {
-                viewModel.MealPlans = context.MealPlans
+                viewModel.MealPlans = _mealPlanService.GetAll()
                     .Select(mp => new SelectListItem { Value = mp.Id.ToString(), Text = mp.Title })
                     .ToList();
 
@@ -102,7 +101,7 @@ namespace MealPlannerApp.Controllers
                 return View(viewModel);
             }
 
-            var item = context.GroceryItems.Find(id);
+            var item = _groceryItemService.GetById(id);
             if (item == null) return NotFound();
 
             item.Name = viewModel.Name;
@@ -110,29 +109,22 @@ namespace MealPlannerApp.Controllers
             item.IsPurchased = viewModel.IsPurchased;
             item.MealPlanId = viewModel.MealPlanId;
 
-            context.SaveChanges();
+            _groceryItemService.Update(item);
             return RedirectToAction(nameof(Index));
         }
 
         public IActionResult Delete(int id)
         {
-            var item = context.GroceryItems.Find(id);
+            var item = _groceryItemService.GetById(id);
             if (item == null) return NotFound();
             return View(item);
         }
 
-        //TODO: Fix this
-        [HttpPost, ActionName("DeleteConfirmed")]
+        [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public IActionResult DeleteConfirmed(int id)
         {
-            var item = context.GroceryItems.Find(id);
-            if (item != null)
-            {
-                context.GroceryItems.Remove(item);
-                context.SaveChanges();
-            }
-
+            _groceryItemService.Delete(id);
             return RedirectToAction(nameof(Index));
         }
     }
