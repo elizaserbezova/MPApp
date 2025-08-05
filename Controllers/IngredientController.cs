@@ -1,42 +1,31 @@
 ﻿using MealPlannerApp.Data;
 using MealPlannerApp.Models;
-using MealPlannerApp.Services.Interfaces;
 using MealPlannerApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 
 namespace MealPlannerApp.Controllers
 {
     public class IngredientController : Controller
     {
-        private readonly IIngredientService _ingredientService;
-        private readonly ApplicationDbContext _context;
+        private readonly ApplicationDbContext context;
 
-        public IngredientController(IIngredientService ingredientService, ApplicationDbContext context)
+        public IngredientController(ApplicationDbContext context)
         {
-            _ingredientService = ingredientService;
-            _context = context; // само за да зареждаме Recipes
+            this.context = context;
         }
 
         public IActionResult Index()
         {
-            var ingredients = _ingredientService.GetAll()
-                .Select(i =>
-                {
-                    i.Recipe = _context.Recipes.FirstOrDefault(r => r.Id == i.RecipeId);
-                    return i;
-                }).ToList();
-
+            var ingredients = context.Ingredients.Include(i => i.Recipe).ToList();
             return View(ingredients);
         }
 
         public IActionResult Details(int id)
         {
-            var ingredient = _ingredientService.GetById(id);
+            var ingredient = context.Ingredients.Include(i => i.Recipe).FirstOrDefault(i => i.Id == id);
             if (ingredient == null) return NotFound();
-
-            ingredient.Recipe = _context.Recipes.FirstOrDefault(r => r.Id == ingredient.RecipeId);
-
             return View(ingredient);
         }
 
@@ -44,7 +33,7 @@ namespace MealPlannerApp.Controllers
         {
             var viewModel = new IngredientFormViewModel
             {
-                Recipes = _context.Recipes
+                Recipes = context.Recipes
                     .Select(r => new SelectListItem
                     {
                         Value = r.Id.ToString(),
@@ -59,6 +48,13 @@ namespace MealPlannerApp.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult Create(IngredientFormViewModel viewModel)
         {
+            foreach (var state in ModelState)
+            {
+                foreach (var error in state.Value.Errors)
+                {
+                    Console.WriteLine($"❌ {state.Key}: {error.ErrorMessage}");
+                }
+            }
             if (ModelState.IsValid)
             {
                 var ingredient = new Ingredient
@@ -68,11 +64,13 @@ namespace MealPlannerApp.Controllers
                     RecipeId = viewModel.RecipeId
                 };
 
-                _ingredientService.Create(ingredient);
+                context.Ingredients.Add(ingredient);
+                context.SaveChanges();
+
                 return RedirectToAction(nameof(Index));
             }
 
-            viewModel.Recipes = _context.Recipes
+            viewModel.Recipes = context.Recipes
                 .Select(r => new SelectListItem
                 {
                     Value = r.Id.ToString(),
@@ -84,7 +82,7 @@ namespace MealPlannerApp.Controllers
 
         public IActionResult Edit(int id)
         {
-            var ingredient = _ingredientService.GetById(id);
+            var ingredient = context.Ingredients.FirstOrDefault(i => i.Id == id);
             if (ingredient == null) return NotFound();
 
             var viewModel = new IngredientFormViewModel
@@ -93,12 +91,9 @@ namespace MealPlannerApp.Controllers
                 Name = ingredient.Name,
                 Quantity = ingredient.Quantity,
                 RecipeId = ingredient.RecipeId,
-                Recipes = _context.Recipes
-                    .Select(r => new SelectListItem
-                    {
-                        Value = r.Id.ToString(),
-                        Text = r.Name
-                    }).ToList()
+                Recipes = context.Recipes
+                    .Select(r => new SelectListItem { Value = r.Id.ToString(), Text = r.Name })
+                    .ToList()
             };
 
             return View(viewModel);
@@ -110,36 +105,47 @@ namespace MealPlannerApp.Controllers
         {
             if (!ModelState.IsValid)
             {
-                model.Recipes = _context.Recipes
+                model.Recipes = context.Recipes
                     .Select(r => new SelectListItem { Value = r.Id.ToString(), Text = r.Name })
                     .ToList();
                 return View(model);
             }
 
-            var ingredient = _ingredientService.GetById(model.Id);
+            var ingredient = context.Ingredients.FirstOrDefault(i => i.Id == model.Id);
             if (ingredient == null) return NotFound();
 
             ingredient.Name = model.Name;
             ingredient.Quantity = model.Quantity;
             ingredient.RecipeId = model.RecipeId;
 
-            _ingredientService.Update(ingredient);
+            context.SaveChanges();
+
             return RedirectToAction(nameof(Index));
         }
 
         public IActionResult Delete(int id)
         {
-            var ingredient = _ingredientService.GetById(id);
-            if (ingredient == null) return NotFound();
+            var ingredient = context.Ingredients.FirstOrDefault(i => i.Id == id);
+
+            if (ingredient == null)
+            {
+                return NotFound();
+            }
 
             return View(ingredient);
         }
 
-        [HttpPost, ActionName("Delete")]
+        [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult DeleteConfirmed(int id)
         {
-            _ingredientService.Delete(id);
+            var ingredient = context.Ingredients.Find(id);
+            if (ingredient == null)
+                return NotFound();
+
+            context.Ingredients.Remove(ingredient);
+            context.SaveChanges();
+
             return RedirectToAction(nameof(Index));
         }
     }
