@@ -21,9 +21,10 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 })
 .AddEntityFrameworkStores<ApplicationDbContext>();
 
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IMealService, MealService>();
-builder.Services.AddAutoMapper(typeof(MappingProfile));
+builder.Services.AddScoped<IMealPlanService, MealPlanService>();
 
 var app = builder.Build();
 

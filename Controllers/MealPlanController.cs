@@ -1,191 +1,93 @@
-﻿using MealPlannerApp.Data;
+﻿using AutoMapper;
+using MealPlannerApp.Interfaces;
 using MealPlannerApp.Models;
 using MealPlannerApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 
 namespace MealPlannerApp.Controllers
 {
     public class MealPlanController : Controller
     {
-        private readonly ApplicationDbContext context;
+        private readonly IMealPlanService _mealPlanService;
+        private readonly IMapper _mapper;
 
-        public MealPlanController(ApplicationDbContext context)
+        public MealPlanController(IMealPlanService mealPlanService, IMapper mapper)
         {
-            this.context = context;
+            _mealPlanService = mealPlanService;
+            _mapper = mapper;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var plans = context.MealPlans.Include(p => p.Meals).ToList();
-            return View(plans);
+            var mealPlans = await _mealPlanService.GetAllMealPlansAsync();
+            return View(mealPlans);
         }
 
-        public IActionResult Details(int id)
+        public async Task<IActionResult> Details(int id)
         {
-            var plan = context.MealPlans
-                .Include(p => p.Meals)
-                .ThenInclude(m => m.Recipe)
-                .FirstOrDefault(p => p.Id == id);
-
-            if (plan == null)
-            {
+            var mealPlan = await _mealPlanService.GetMealPlanByIdAsync(id);
+            if (mealPlan == null)
                 return NotFound();
-            }
-            return View(plan);
+
+            return View(mealPlan);
         }
 
         public IActionResult Create()
         {
-            var meals = context.Meals.ToList();
-
-            var viewModel = new MealPlanFormViewModel
-            {
-                AllMeals = meals.Select(m => new SelectListItem
-                {
-                    Value = m.Id.ToString(),
-                    Text = m.Name
-                }).ToList()
-            };
-
-            return View(viewModel);
+            return View(new MealPlanFormViewModel());
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create(MealPlanFormViewModel viewModel)
+        public async Task<IActionResult> Create(MealPlanFormViewModel viewModel)
         {
             if (!ModelState.IsValid)
-            {
-                viewModel.AllMeals = context.Meals.Select(m => new SelectListItem
-                {
-                    Value = m.Id.ToString(),
-                    Text = m.Name
-                }).ToList();
-
                 return View(viewModel);
-            }
 
-            // Step 1: Create and save MealPlan
-            var mealPlan = new MealPlan
-            {
-                Title = viewModel.Title,
-                StartDate = viewModel.StartDate,
-                EndDate = viewModel.EndDate
-            };
-
-            context.MealPlans.Add(mealPlan);
-            context.SaveChanges(); // now mealPlan.Id is set
-
-            // Load all meals into memory, then filter
-            var allMeals = context.Meals.ToList(); // Fetches everything from DB
-            var selectedMeals = allMeals
-                .Where(m => viewModel.SelectedMealIds.Contains(m.Id))
-                .ToList(); // Filter in C#
-
-            foreach (var meal in selectedMeals)
-            {
-                meal.MealPlanId = mealPlan.Id;
-            }
-
-            context.SaveChanges();
-
+            var mealPlan = _mapper.Map<MealPlan>(viewModel);
+            await _mealPlanService.AddMealPlanAsync(mealPlan);
             return RedirectToAction(nameof(Index));
         }
 
-        public IActionResult Edit(int id)
+        public async Task<IActionResult> Edit(int id)
         {
-            var plan = context.MealPlans
-                .Include(mp => mp.Meals)
-                .FirstOrDefault(mp => mp.Id == id);
-
-            if (plan == null)
-            {
-                return NotFound();
-            }
-
-            var viewModel = new MealPlanFormViewModel
-            {
-                Id = plan.Id,
-                Title = plan.Title,
-                StartDate = plan.StartDate,
-                EndDate = plan.EndDate,
-                SelectedMealIds = plan.Meals.Select(m => m.Id).ToList(),
-                AllMeals = context.Meals.Select(m => new SelectListItem
-                {
-                    Value = m.Id.ToString(),
-                    Text = m.Name
-                }).ToList()
-            };
-
-            return View(viewModel);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Edit(MealPlanFormViewModel viewModel)
-        {
-            if (!ModelState.IsValid)
-            {
-                viewModel.AllMeals = context.Meals.Select(m => new SelectListItem
-                {
-                    Value = m.Id.ToString(),
-                    Text = m.Name
-                }).ToList();
-                return View(viewModel);
-            }
-
-            var mealPlan = context.MealPlans
-                .Include(mp => mp.Meals)
-                .FirstOrDefault(mp => mp.Id == viewModel.Id);
-
+            var mealPlan = await _mealPlanService.GetMealPlanByIdAsync(id);
             if (mealPlan == null)
-            {
                 return NotFound();
-            }
 
-            mealPlan.Title = viewModel.Title;
-            mealPlan.StartDate = viewModel.StartDate;
-            mealPlan.EndDate = viewModel.EndDate;
+            var viewModel = _mapper.Map<MealPlanFormViewModel>(mealPlan);
+            return View(viewModel);
+        }
 
-            // Clear and update selected meals
-            mealPlan.Meals.Clear();
-            var selectedMeals = context.Meals
-                .Where(m => viewModel.SelectedMealIds.Contains(m.Id))
-                .ToList();
-            mealPlan.Meals.AddRange(selectedMeals);
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, MealPlanFormViewModel viewModel)
+        {
+            if (id != viewModel.Id)
+                return BadRequest();
 
-            context.SaveChanges();
+            if (!ModelState.IsValid)
+                return View(viewModel);
 
+            var mealPlan = _mapper.Map<MealPlan>(viewModel);
+            await _mealPlanService.UpdateMealPlanAsync(mealPlan);
             return RedirectToAction(nameof(Index));
         }
 
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var plan = context.MealPlans.Find(id);
-            if (plan == null)
-            {
+            var mealPlan = await _mealPlanService.GetMealPlanByIdAsync(id);
+            if (mealPlan == null)
                 return NotFound();
-            }
-            return View(plan);
+
+            return View(mealPlan);
         }
 
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        public IActionResult DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var plan = context.MealPlans
-                .Include(mp => mp.Meals)
-                .FirstOrDefault(p => p.Id == id);
-
-            if (plan != null)
-            {
-                plan.Meals.Clear(); // Ensure FK deletion doesn't fail
-                context.MealPlans.Remove(plan);
-                context.SaveChanges();
-            }
-
+            await _mealPlanService.DeleteMealPlanAsync(id);
             return RedirectToAction(nameof(Index));
         }
     }

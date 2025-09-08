@@ -9,6 +9,7 @@ namespace MealPlannerApp.Mapping
         public MappingProfile()
         {
             CreateMap<Meal, MealFormViewModel>().ReverseMap();
+            CreateMap<MealPlan, MealPlanFormViewModel>().ReverseMap();
         }
     }
 }
