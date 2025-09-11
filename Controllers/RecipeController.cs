@@ -1,94 +1,108 @@
-﻿using MealPlannerApp.Data;
+﻿using AutoMapper;
+using MealPlannerApp.Interfaces;
 using MealPlannerApp.Models;
+using MealPlannerApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace MealPlannerApp.Controllers
 {
     public class RecipeController : Controller
     {
-        private readonly ApplicationDbContext context;
+        private readonly IRecipeService _recipeService;
+        private readonly IMapper _mapper;
 
-        public RecipeController(ApplicationDbContext context)
+        public RecipeController(IRecipeService recipeService, IMapper mapper)
         {
-            this.context = context;
+            _recipeService = recipeService;
+            _mapper = mapper;
         }
 
-        public IActionResult Index ()
+        public async Task<IActionResult> Index()
         {
-            var recipes = context.Recipes.ToList();
-            return View(recipes);
+            var recipes = await _recipeService.GetAllRecipesAsync();
+            var viewModels = _mapper.Map<IEnumerable<RecipeFormViewModel>>(recipes);
+            return View(viewModels);
+        }
+
+
+        public async Task<IActionResult> Details(int id)
+        {
+            var recipe = await _recipeService.GetRecipeByIdAsync(id);
+
+            if (recipe == null)
+            {
+                return NotFound();
+            }
+                
+            var viewModel = _mapper.Map<RecipeFormViewModel>(recipe);
+            return View(viewModel);
         }
 
         public IActionResult Create()
         {
-            return View();
+            return View(new RecipeFormViewModel());
         }
 
         [HttpPost]
-        public IActionResult Create(Recipe recipe)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(RecipeFormViewModel viewModel)
         {
-            if (ModelState.IsValid)
-            {
-                context.Recipes.Add(recipe);
-                context.SaveChanges();
-                return RedirectToAction(nameof(Index));
-            }
-            return View(recipe);
-        }
+            if (!ModelState.IsValid)
+                return View(viewModel);
 
-        public IActionResult Details(int Id)
-        {
-            var recipe = context.Recipes.FirstOrDefault(r => r.Id == Id);
-            if(recipe == null)
-            {
-                return NotFound();
-            }
-            return View(recipe);
-        }
-
-        public IActionResult Delete(int Id)
-        {
-            var recipe = context.Recipes.FirstOrDefault(r => r.Id == Id);
-            if (recipe == null)
-            {
-                return NotFound();
-            }
-            return View(recipe);
-        }
-
-        [HttpPost, ActionName("Delete")]
-        public IActionResult DeleteConfirmed(int Id)
-        {
-            var recipe = context.Recipes.FirstOrDefault(r => r.Id == Id);
-            if (recipe != null)
-            {
-                context.Recipes.Remove(recipe);
-                context.SaveChanges();
-            }
+            var recipe = _mapper.Map<Recipe>(viewModel);
+            await _recipeService.AddRecipeAsync(recipe);
             return RedirectToAction(nameof(Index));
         }
 
-        public IActionResult Edit(int id)
+        public async Task<IActionResult> Edit(int id)
         {
-            var recipe = context.Recipes.FirstOrDefault(r => r.Id == id);
+            var recipe = await _recipeService.GetRecipeByIdAsync(id);
+            
             if (recipe == null)
+            {
                 return NotFound();
+            }
 
-            return View(recipe);
+            var viewModel = _mapper.Map<RecipeFormViewModel>(recipe);
+            return View(viewModel);
         }
 
         [HttpPost]
-        public IActionResult Edit(Recipe recipe)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, RecipeFormViewModel viewModel)
         {
-            if (ModelState.IsValid)
+            if (id != viewModel.Id)
+                return BadRequest();
+
+            if (!ModelState.IsValid)
+                return View(viewModel);
+
+            var recipe = _mapper.Map<Recipe>(viewModel);
+            await _recipeService.UpdateRecipeAsync(recipe);
+            return RedirectToAction(nameof(Index));
+        }
+
+        public async Task<IActionResult> Delete(int id)
+        {
+            var recipe = await _recipeService.GetRecipeByIdAsync(id);
+            
+            if (recipe == null)
             {
-                context.Recipes.Update(recipe);
-                context.SaveChanges();
-                return RedirectToAction(nameof(Index));
+                return NotFound();
             }
 
-            return View(recipe);
+            var viewModel = _mapper.Map<RecipeFormViewModel>(recipe);
+            return View(viewModel);
+        }
+
+
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            await _recipeService.DeleteRecipeAsync(id);
+            return RedirectToAction(nameof(Index));
         }
     }
 }

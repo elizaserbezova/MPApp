@@ -12,6 +12,8 @@ namespace MealPlannerApp.Mapping
             CreateMap<MealPlan, MealPlanFormViewModel>().ReverseMap();
             CreateMap<GroceryItem, GroceryItemFormViewModel>().ReverseMap();
             CreateMap<Ingredient, IngredientFormViewModel>().ReverseMap();
+            CreateMap<Recipe, RecipeFormViewModel>().ReverseMap();
+
         }
     }
 }
