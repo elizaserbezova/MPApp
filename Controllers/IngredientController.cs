@@ -1,151 +1,93 @@
-﻿using MealPlannerApp.Data;
+﻿using AutoMapper;
+using MealPlannerApp.Interfaces;
 using MealPlannerApp.Models;
 using MealPlannerApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 
 namespace MealPlannerApp.Controllers
 {
     public class IngredientController : Controller
     {
-        private readonly ApplicationDbContext context;
+        private readonly IIngredientService _ingredientService;
+        private readonly IMapper _mapper;
 
-        public IngredientController(ApplicationDbContext context)
+        public IngredientController(IIngredientService ingredientService, IMapper mapper)
         {
-            this.context = context;
+            _ingredientService = ingredientService;
+            _mapper = mapper;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var ingredients = context.Ingredients.Include(i => i.Recipe).ToList();
+            var ingredients = await _ingredientService.GetAllIngredientsAsync();
             return View(ingredients);
         }
 
-        public IActionResult Details(int id)
+        public async Task<IActionResult> Details(int id)
         {
-            var ingredient = context.Ingredients.Include(i => i.Recipe).FirstOrDefault(i => i.Id == id);
-            if (ingredient == null) return NotFound();
+            var ingredient = await _ingredientService.GetIngredientByIdAsync(id);
+            if (ingredient == null)
+                return NotFound();
+
             return View(ingredient);
         }
 
         public IActionResult Create()
         {
-            var viewModel = new IngredientFormViewModel
-            {
-                Recipes = context.Recipes
-                    .Select(r => new SelectListItem
-                    {
-                        Value = r.Id.ToString(),
-                        Text = r.Name
-                    }).ToList()
-            };
-
-            return View(viewModel);
+            return View(new IngredientFormViewModel());
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create(IngredientFormViewModel viewModel)
-        {
-            foreach (var state in ModelState)
-            {
-                foreach (var error in state.Value.Errors)
-                {
-                    Console.WriteLine($"❌ {state.Key}: {error.ErrorMessage}");
-                }
-            }
-            if (ModelState.IsValid)
-            {
-                var ingredient = new Ingredient
-                {
-                    Name = viewModel.Name,
-                    Quantity = viewModel.Quantity,
-                    RecipeId = viewModel.RecipeId
-                };
-
-                context.Ingredients.Add(ingredient);
-                context.SaveChanges();
-
-                return RedirectToAction(nameof(Index));
-            }
-
-            viewModel.Recipes = context.Recipes
-                .Select(r => new SelectListItem
-                {
-                    Value = r.Id.ToString(),
-                    Text = r.Name
-                }).ToList();
-
-            return View(viewModel);
-        }
-
-        public IActionResult Edit(int id)
-        {
-            var ingredient = context.Ingredients.FirstOrDefault(i => i.Id == id);
-            if (ingredient == null) return NotFound();
-
-            var viewModel = new IngredientFormViewModel
-            {
-                Id = ingredient.Id,
-                Name = ingredient.Name,
-                Quantity = ingredient.Quantity,
-                RecipeId = ingredient.RecipeId,
-                Recipes = context.Recipes
-                    .Select(r => new SelectListItem { Value = r.Id.ToString(), Text = r.Name })
-                    .ToList()
-            };
-
-            return View(viewModel);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Edit(IngredientFormViewModel model)
+        public async Task<IActionResult> Create(IngredientFormViewModel viewModel)
         {
             if (!ModelState.IsValid)
-            {
-                model.Recipes = context.Recipes
-                    .Select(r => new SelectListItem { Value = r.Id.ToString(), Text = r.Name })
-                    .ToList();
-                return View(model);
-            }
+                return View(viewModel);
 
-            var ingredient = context.Ingredients.FirstOrDefault(i => i.Id == model.Id);
-            if (ingredient == null) return NotFound();
-
-            ingredient.Name = model.Name;
-            ingredient.Quantity = model.Quantity;
-            ingredient.RecipeId = model.RecipeId;
-
-            context.SaveChanges();
-
+            var ingredient = _mapper.Map<Ingredient>(viewModel);
+            await _ingredientService.AddIngredientAsync(ingredient);
             return RedirectToAction(nameof(Index));
         }
 
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Edit(int id)
         {
-            var ingredient = context.Ingredients.FirstOrDefault(i => i.Id == id);
-
+            var ingredient = await _ingredientService.GetIngredientByIdAsync(id);
             if (ingredient == null)
-            {
                 return NotFound();
-            }
+
+            var viewModel = _mapper.Map<IngredientFormViewModel>(ingredient);
+            return View(viewModel);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, IngredientFormViewModel viewModel)
+        {
+            if (id != viewModel.Id)
+                return BadRequest();
+
+            if (!ModelState.IsValid)
+                return View(viewModel);
+
+            var ingredient = _mapper.Map<Ingredient>(viewModel);
+            await _ingredientService.UpdateIngredientAsync(ingredient);
+            return RedirectToAction(nameof(Index));
+        }
+
+        public async Task<IActionResult> Delete(int id)
+        {
+            var ingredient = await _ingredientService.GetIngredientByIdAsync(id);
+            if (ingredient == null)
+                return NotFound();
 
             return View(ingredient);
         }
 
-        [HttpPost]
+        [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        public IActionResult DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var ingredient = context.Ingredients.Find(id);
-            if (ingredient == null)
-                return NotFound();
-
-            context.Ingredients.Remove(ingredient);
-            context.SaveChanges();
-
+            await _ingredientService.DeleteIngredientAsync(id);
             return RedirectToAction(nameof(Index));
         }
     }
