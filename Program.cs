@@ -25,6 +25,7 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IMealService, MealService>();
 builder.Services.AddScoped<IMealPlanService, MealPlanService>();
+builder.Services.AddScoped<IGroceryItemService, GroceryItemService>();
 
 var app = builder.Build();
 

@@ -1,138 +1,93 @@
-﻿using MealPlannerApp.Data;
+﻿using AutoMapper;
+using MealPlannerApp.Interfaces;
 using MealPlannerApp.Models;
 using MealPlannerApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 
 namespace MealPlannerApp.Controllers
 {
     public class GroceryItemController : Controller
     {
-        private readonly ApplicationDbContext context;
+        private readonly IGroceryItemService _groceryItemService;
+        private readonly IMapper _mapper;
 
-        public GroceryItemController(ApplicationDbContext context)
+        public GroceryItemController(IGroceryItemService groceryItemService, IMapper mapper)
         {
-            this.context = context;
+            _groceryItemService = groceryItemService;
+            _mapper = mapper;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var items = context.GroceryItems.Include(g => g.MealPlan).ToList();
+            var items = await _groceryItemService.GetAllGroceryItemsAsync();
             return View(items);
         }
 
-        public IActionResult Details(int id)
+        public async Task<IActionResult> Details(int id)
         {
-            var item = context.GroceryItems.Include(g => g.MealPlan).FirstOrDefault(g => g.Id == id);
-            if (item == null) return NotFound();
+            var item = await _groceryItemService.GetGroceryItemByIdAsync(id);
+            if (item == null)
+                return NotFound();
+
             return View(item);
         }
 
         public IActionResult Create()
         {
-            var viewModel = new GroceryItemFormViewModel
-            {
-                MealPlans = context.MealPlans
-                    .Select(mp => new SelectListItem { Value = mp.Id.ToString(), Text = mp.Title })
-                    .ToList()
-            };
+            return View(new GroceryItemFormViewModel());
+        }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(GroceryItemFormViewModel viewModel)
+        {
+            if (!ModelState.IsValid)
+                return View(viewModel);
+
+            var item = _mapper.Map<GroceryItem>(viewModel);
+            await _groceryItemService.AddGroceryItemAsync(item);
+            return RedirectToAction(nameof(Index));
+        }
+
+        public async Task<IActionResult> Edit(int id)
+        {
+            var item = await _groceryItemService.GetGroceryItemByIdAsync(id);
+            if (item == null)
+                return NotFound();
+
+            var viewModel = _mapper.Map<GroceryItemFormViewModel>(item);
             return View(viewModel);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create(GroceryItemFormViewModel viewModel)
+        public async Task<IActionResult> Edit(int id, GroceryItemFormViewModel viewModel)
         {
+            if (id != viewModel.Id)
+                return BadRequest();
+
             if (!ModelState.IsValid)
-            {
-                viewModel.MealPlans = context.MealPlans
-                    .Select(mp => new SelectListItem { Value = mp.Id.ToString(), Text = mp.Title })
-                    .ToList();
-
                 return View(viewModel);
-            }
 
-            var item = new GroceryItem
-            {
-                Name = viewModel.Name,
-                Quantity = viewModel.Quantity,
-                IsPurchased = viewModel.IsPurchased,
-                MealPlanId = viewModel.MealPlanId
-            };
-
-            context.GroceryItems.Add(item);
-            context.SaveChanges();
-
+            var item = _mapper.Map<GroceryItem>(viewModel);
+            await _groceryItemService.UpdateGroceryItemAsync(item);
             return RedirectToAction(nameof(Index));
         }
 
-        public IActionResult Edit(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var item = context.GroceryItems.Find(id);
-            if (item == null) return NotFound();
+            var item = await _groceryItemService.GetGroceryItemByIdAsync(id);
+            if (item == null)
+                return NotFound();
 
-            var viewModel = new GroceryItemFormViewModel
-            {
-                Name = item.Name,
-                Quantity = item.Quantity,
-                IsPurchased = item.IsPurchased,
-                MealPlanId = item.MealPlanId,
-                MealPlans = context.MealPlans
-                    .Select(mp => new SelectListItem { Value = mp.Id.ToString(), Text = mp.Title })
-                    .ToList()
-            };
-
-            ViewBag.Id = id;
-            return View(viewModel);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Edit(int id, GroceryItemFormViewModel viewModel)
-        {
-            if (!ModelState.IsValid)
-            {
-                viewModel.MealPlans = context.MealPlans
-                    .Select(mp => new SelectListItem { Value = mp.Id.ToString(), Text = mp.Title })
-                    .ToList();
-
-                ViewBag.Id = id;
-                return View(viewModel);
-            }
-
-            var item = context.GroceryItems.Find(id);
-            if (item == null) return NotFound();
-
-            item.Name = viewModel.Name;
-            item.Quantity = viewModel.Quantity;
-            item.IsPurchased = viewModel.IsPurchased;
-            item.MealPlanId = viewModel.MealPlanId;
-
-            context.SaveChanges();
-            return RedirectToAction(nameof(Index));
-        }
-
-        public IActionResult Delete(int id)
-        {
-            var item = context.GroceryItems.Find(id);
-            if (item == null) return NotFound();
             return View(item);
         }
 
-        //TODO: Fix this
-        [HttpPost, ActionName("DeleteConfirmed")]
+        [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        public IActionResult DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var item = context.GroceryItems.Find(id);
-            if (item != null)
-            {
-                context.GroceryItems.Remove(item);
-                context.SaveChanges();
-            }
-
+            await _groceryItemService.DeleteGroceryItemAsync(id);
             return RedirectToAction(nameof(Index));
         }
     }
